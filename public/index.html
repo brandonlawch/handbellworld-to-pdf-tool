@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HandbellWorld to PDF Tool</title>
+  <style>
+    body { font-family: sans-serif; background: #f6f8fa; margin: 0; padding: 20px; }
+    h1 { text-align: center; }
+    #controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+    input, button { padding: 10px; font-size: 16px; }
+    #piece-title { text-align: center; margin-bottom: 10px; }
+    #thumbnails { display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); gap: 20px; }
+    .thumb { border: 3px solid transparent; border-radius: 6px; overflow: hidden; cursor: pointer; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.1); transition: transform 0.2s, border 0.2s; }
+    .thumb img { width: 100%; display: block; object-fit: cover; max-height: 600px;}
+    .thumb.selected { border-color: #007bff; transform: scale(1.02); }
+    .dragging { opacity: 0.5; }
+    #actions { text-align: center; margin-top: 20px; margin-bottom: 10px; }
+    #actions button { margin: 0 10px; }
+    #spinner { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; }
+    #spinner div { width: 40px; height: 40px; border: 5px solid #ccc; border-top-color: #007bff; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<h1>HandbellWorld to PDF Tool</h1>
+
+<div id="controls">
+  <input id="stocknum" placeholder="Stock number (e.g. MLC201576L)">
+  <button onclick="loadPreviews()">Load Previews</button>
+</div>
+
+<h2 id="piece-title"></h2>
+
+<div id="actions">
+  <button onclick="selectAll()">Select All</button>
+  <button onclick="clearSelection()">Clear Selection</button>
+  <button onclick="downloadPDF()">Download PDF</button>
+</div>
+
+<div id="spinner"><div></div></div>
+
+<div id="thumbnails"></div>
+
+<script>
+let allImages = [];
+
+function showSpinner(show = true) {
+  document.getElementById('spinner').style.display = show ? 'block' : 'none';
+}
+
+async function loadPreviews() {
+  const stocknum = document.getElementById('stocknum').value.trim();
+  if (!stocknum) return alert('Enter a stock number!');
+  showSpinner(true);
+
+  try {
+    const resp = await fetch(`/api/preview/${stocknum}`);
+    const data = await resp.json();
+    allImages = data.images;
+    const pieceTitle = data.title || '';
+    document.getElementById('piece-title').textContent = pieceTitle;
+
+    const container = document.getElementById('thumbnails');
+    container.innerHTML = '';
+    allImages.forEach((url, i) => {
+      const div = document.createElement('div');
+      div.className = 'thumb';
+      if (i === 0) div.classList.add('cover'); // mark first page as cover
+      div.draggable = true;
+      div.dataset.index = i;
+
+      const img = document.createElement('img');
+      img.src = url;
+      div.appendChild(img);
+
+      div.addEventListener('click', () => div.classList.toggle('selected'));
+      div.addEventListener('dragstart', dragStart);
+      div.addEventListener('dragover', dragOver);
+      div.addEventListener('drop', drop);
+      div.addEventListener('dragend', dragEnd);
+
+      container.appendChild(div);
+    });
+  } catch (err) {
+    alert('Failed to load previews.');
+    console.error(err);
+  } finally {
+    showSpinner(false);
+  }
+}
+
+function selectAll() { document.querySelectorAll('.thumb').forEach(el => el.classList.add('selected')); }
+function clearSelection() { document.querySelectorAll('.thumb').forEach(el => el.classList.remove('selected')); }
+
+// Drag & Drop
+let dragSrc = null;
+function dragStart(e) { dragSrc = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function drop(e) {
+  e.stopPropagation();
+  if (dragSrc !== this) {
+    const container = document.getElementById('thumbnails');
+    const children = Array.from(container.children);
+    const srcIndex = children.indexOf(dragSrc);
+    const destIndex = children.indexOf(this);
+    if (srcIndex < destIndex) container.insertBefore(dragSrc, this.nextSibling);
+    else container.insertBefore(dragSrc, this);
+  }
+}
+function dragEnd() { this.classList.remove('dragging'); }
+
+async function downloadPDF() {
+  const selected = Array.from(document.querySelectorAll('.thumb.selected img')).map(img => img.src);
+  if (!selected.length) return alert('Select at least one page.');
+
+  showSpinner(true);
+  try {
+    const stocknum = document.getElementById('stocknum').value.trim();
+    const respTitle = await fetch(`/api/preview/${stocknum}`);
+    const data = await respTitle.json();
+    const pieceTitle = data.title || '';
+
+    const resp = await fetch('/api/make-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images: selected })
+    });
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeTitle = pieceTitle.replace(/[\/\\?%*:|"<>]/g, '_');
+    a.href = url;
+    a.download = `${stocknum} - ${safeTitle}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Failed to generate PDF.');
+    console.error(err);
+  } finally {
+    showSpinner(false);
+  }
+}
+</script>
+</body>
+</html>
