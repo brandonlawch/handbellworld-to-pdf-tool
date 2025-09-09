@@ -73,8 +73,6 @@ async function loadPreviews() {
 
       const img = document.createElement('img');
       img.src = url;
-      img.id = "HideImg";
-      img.onerror = "hideImg()";
       div.appendChild(img);
 
       div.addEventListener('click', () => div.classList.toggle('selected'));
@@ -91,10 +89,6 @@ async function loadPreviews() {
   } finally {
     showSpinner(false);
   }
-}
-
-function hideImg() {
-  document.getElementById("HideImg").style.display = "none";
 }
 
 function selectAll() { document.querySelectorAll('.thumb').forEach(el => el.classList.add('selected')); }
