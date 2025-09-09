@@ -12,7 +12,7 @@
     #piece-title { text-align: center; margin-bottom: 10px; }
     #thumbnails { display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); gap: 20px; }
     .thumb { border: 3px solid transparent; border-radius: 6px; overflow: hidden; cursor: pointer; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.1); transition: transform 0.2s, border 0.2s; }
-    .thumb img { width: 100%; display: block; object-fit: cover; max-height: 600px;}
+    .thumb img { width: 100%; display: block; max-height: 600px;}
     .thumb.selected { border-color: #007bff; transform: scale(1.02); }
     .dragging { opacity: 0.5; }
     #actions { text-align: center; margin-top: 20px; margin-bottom: 10px; }
@@ -50,6 +50,7 @@ function showSpinner(show = true) {
 }
 
 async function loadPreviews() {
+  document.getElementById('thumbnails').replaceChildren();
   const stocknum = document.getElementById('stocknum').value.trim();
   if (!stocknum) return alert('Enter a stock number!');
   showSpinner(true);
@@ -72,6 +73,8 @@ async function loadPreviews() {
 
       const img = document.createElement('img');
       img.src = url;
+      img.id = "HideImg";
+      img.onerror = "hideImg()";
       div.appendChild(img);
 
       div.addEventListener('click', () => div.classList.toggle('selected'));
@@ -88,6 +91,10 @@ async function loadPreviews() {
   } finally {
     showSpinner(false);
   }
+}
+
+function hideImg() {
+  document.getElementById("HideImg").style.display = "none";
 }
 
 function selectAll() { document.querySelectorAll('.thumb').forEach(el => el.classList.add('selected')); }
@@ -111,37 +118,44 @@ function drop(e) {
 function dragEnd() { this.classList.remove('dragging'); }
 
 async function downloadPDF() {
-  const selected = Array.from(document.querySelectorAll('.thumb.selected img')).map(img => img.src);
-  if (!selected.length) return alert('Select at least one page.');
+  const thumbnails = Array.from(document.querySelectorAll('.thumb'));
+  const selectedIndexes = thumbnails
+    .map((el, i) => el.classList.contains('selected') ? i : null)
+    .filter(i => i !== null);
+
+  if (selectedIndexes.length === 0) {
+    alert("Please select at least one page.");
+    return;
+  }
 
   showSpinner(true);
-  try {
-    const stocknum = document.getElementById('stocknum').value.trim();
-    const respTitle = await fetch(`/api/preview/${stocknum}`);
-    const data = await respTitle.json();
-    const pieceTitle = data.title || '';
 
-    const resp = await fetch('/api/make-pdf', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ images: selected })
+  try {
+    const stockNum = document.getElementById("stocknum").value.trim();
+    const res = await fetch("/api/make-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stockNum, selectedIndexes }),
     });
 
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const safeTitle = pieceTitle.replace(/[\/\\?%*:|"<>]/g, '_');
+    if (!res.ok) throw new Error(`PDF creation failed`);
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeTitle = document.getElementById('piece-title').textContent.replace(/[\/\\?%*:|"<>]/g, '_');
     a.href = url;
-    a.download = `${stocknum} - ${safeTitle}.pdf`;
+    a.download = `${stockNum} - ${safeTitle}.pdf`;
     a.click();
-    URL.revokeObjectURL(url);
+    window.URL.revokeObjectURL(url);
   } catch (err) {
-    alert('Failed to generate PDF.');
-    console.error(err);
+    alert("Error creating PDF: " + err.message);
   } finally {
     showSpinner(false);
   }
 }
+
+
 </script>
 </body>
 </html>
