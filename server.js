@@ -117,10 +117,18 @@ app.post("/api/make-pdf", async (req, res) => {
   }
 
   doc.end();
-  delete cache[stockNum];
+  // delete cache[stockNum];
+});
+
+app.post("/api/clear-cache", (req, res) => {
+  const keys = Object.keys(cache);
+  for (const key of keys) {
+    delete cache[key];
+  }
+  console.log("Cleared Cache");
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`VERSION 2.0.0`);
+  console.log(`VERSION 2.0.1`);
 });

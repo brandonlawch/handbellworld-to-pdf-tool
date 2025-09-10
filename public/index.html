@@ -22,7 +22,7 @@
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
-<body>
+<body onbeforeunload="clearCache()">
 <h1>HandbellWorld to PDF Tool</h1>
 
 <div id="controls">
@@ -43,7 +43,19 @@
 <div id="thumbnails"></div>
 
 <script>
+console.log("VERSION 2.0.1");
 let allImages = [];
+
+function clearCache(){
+  fetch('/api/clear-cache', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: null
+  })
+  .then(response => response.json())
+  .then(data => console.log(data))
+  .catch(error => console.error('Error:', error));
+}
 
 function showSpinner(show = true) {
   document.getElementById('spinner').style.display = show ? 'block' : 'none';
