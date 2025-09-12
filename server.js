@@ -15,6 +15,10 @@ app.use(express.static("public"));
 // In-memory cache: { stockNum: { images: [Buffer], urls: [string], title: string } }
 const cache = {};
 
+const CONCURRENCY = 5; // number of parallel fetches
+const MAX_RETRIES = 1; // retry once
+const RETRY_DELAY = 200; // ms delay before retry
+
 //cron to clear cache
 cron.schedule('0 6 * * 2', () => { 
   console.log("Scheduled Clear Cache Start");
@@ -37,12 +41,11 @@ app.get("/api/preview/:stockNum", async (req, res) => {
     return res.json({ images: cache[stockNum].urls, title: cache[stockNum].title });
   }
 
-
   const base = stockNum.slice(1); // strip "M" prefix if needed
   const prefix = base.slice(0, 2);
   const urls = [];
   const buffers = [];
-  let title = "";
+  let pieceTitle = "";
 
   const userAgents = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
@@ -56,10 +59,10 @@ app.get("/api/preview/:stockNum", async (req, res) => {
     console.log("Get title for " + stockNum);
     const page0Url = `https://www.handbellworld.com/music/preview.cfm?stocknum=${stockNum}&page=0`;
     const page0Resp = await fetch(page0Url, {
-        headers: {
-          'User-Agent': userAgents[Math.floor(Math.random() * userAgents.length)],
-        },
-      });
+      headers: {
+        'User-Agent': userAgents[Math.floor(Math.random() * userAgents.length)],
+      },
+    });
     if (page0Resp.ok) {
       const html = await page0Resp.text();
       const dom = new JSDOM(html);
@@ -68,24 +71,64 @@ app.get("/api/preview/:stockNum", async (req, res) => {
       console.log("Title: " + pieceTitle);
     }
 
-    // Fetch images
-    for (let page = 0; page < 50; page++) {
+    // Helper to fetch a single image with retry + delay
+    const fetchImage = async (page) => {
       const url = `https://www.handbellworld.com/music/preview/images/${prefix}/${base}/${base}-${page}.jpg`;
-      console.log("Start Fetch: " + url.replace("https://www.handbellworld.com/music/preview/images",""));
-      const resp = await fetch(url, {
-        headers: {
-          'User-Agent': userAgents[Math.floor(Math.random() * userAgents.length)],
-        },
-      });
-      if (!resp.ok) {
-        console.log('End Fetch');
-        break;
+      let attempt = 0;
+
+      while (attempt <= MAX_RETRIES) {
+        try {
+          console.log(`Start Fetch (attempt ${attempt + 1}): ${url.replace("https://www.handbellworld.com/music/preview/images","")}`);
+          const resp = await fetch(url, {
+            headers: {
+              'User-Agent': userAgents[Math.floor(Math.random() * userAgents.length)],
+            },
+          });
+
+          if (!resp.ok) {
+            console.log(`Fetch ${url.replace("https://www.handbellworld.com/music/preview/images","")} failed with status ${resp.status}`);
+            return null; // treat 404/500 as missing
+          }
+
+          const buf = await resp.buffer();
+          console.log('Done Fetch: ' + url.replace("https://www.handbellworld.com/music/preview/images",""));
+          return { url, buf };
+        } catch (err) {
+          console.warn(`Fetch error for ${url} (attempt ${attempt + 1}):`, err.message);
+          if (attempt === MAX_RETRIES) {
+            return null; // give up after retries
+          }
+          await sleep(RETRY_DELAY); // wait before retry
+        }
+        attempt++;
       }
 
-      const buf = await resp.buffer();
-      urls.push(url);
-      buffers.push(buf);
-      console.log('Done Fetch: ' + url.replace("https://www.handbellworld.com/music/preview/images",""));
+      return null;
+    };
+
+    // Fetch in batches, stop at first failure
+    let page = 0;
+    let stop = false;
+    while (!stop) {
+      const tasks = [];
+      for (let i = 0; i < CONCURRENCY; i++) {
+        tasks.push(fetchImage(page + i));
+      }
+
+      const results = await Promise.all(tasks);
+
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        if (!r) {
+          console.log("End Fetch (missing page at " + (page + i) + ")");
+          stop = true;
+          break; // stop immediately at first missing page
+        }
+        urls.push(r.url);
+        buffers.push(r.buf);
+      }
+
+      page += CONCURRENCY;
     }
 
     if (urls.length === 0) {
@@ -146,5 +189,5 @@ app.post("/api/clear-cache", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`VERSION 2.0.2`);
+  console.log(`VERSION 2.1.0`);
 });
