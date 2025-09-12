@@ -3,6 +3,7 @@ const fetch = require("node-fetch");
 const PDFDocument = require("pdfkit");
 const cors = require("cors");
 const { JSDOM } = require("jsdom");
+const cron = require('node-cron');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,6 +14,20 @@ app.use(express.static("public"));
 
 // In-memory cache: { stockNum: { images: [Buffer], urls: [string], title: string } }
 const cache = {};
+
+//cron to clear cache
+cron.schedule('0 6 * * 2', () => { 
+  console.log("Scheduled Clear Cache Start");
+  try { 
+    const keys = Object.keys(cache);
+    for (const key of keys) {
+      delete cache[key];
+    }
+    console.log("Scheduled Clear Cache Done");
+  } catch (error) { 
+    console.error('Error running cron job:', error); 
+  } 
+});
 
 // Get preview pages and cache images + title
 app.get("/api/preview/:stockNum", async (req, res) => {
@@ -120,6 +135,7 @@ app.post("/api/make-pdf", async (req, res) => {
   // delete cache[stockNum];
 });
 
+// Clear cache when webpage unload
 app.post("/api/clear-cache", (req, res) => {
   const keys = Object.keys(cache);
   for (const key of keys) {

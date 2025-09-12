@@ -155,7 +155,7 @@ async function downloadPDF() {
     a.click();
     window.URL.revokeObjectURL(url);
   } catch (err) {
-    alert("Error creating PDF: " + err.message);
+    alert("Try loading preview again: " + err.message);
   } finally {
     showSpinner(false);
   }
