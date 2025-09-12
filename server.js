@@ -146,5 +146,5 @@ app.post("/api/clear-cache", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`VERSION 2.0.1`);
+  console.log(`VERSION 2.0.2`);
 });
