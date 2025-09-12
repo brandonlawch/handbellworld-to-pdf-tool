@@ -43,7 +43,7 @@
 <div id="thumbnails"></div>
 
 <script>
-console.log("VERSION 2.0.3");
+console.log("VERSION 2.0.4");
 let allImages = [];
 
 function clearCache(){
@@ -63,6 +63,7 @@ function showSpinner(show = true) {
 
 async function loadPreviews() {
   document.getElementById('thumbnails').replaceChildren();
+  document.getElementById('piece-title').textContent = "";
   const stocknum = document.getElementById('stocknum').value.trim();
   if (!stocknum) return alert('Enter a stock number!');
   showSpinner(true);

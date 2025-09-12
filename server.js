@@ -15,9 +15,9 @@ app.use(express.static("public"));
 // In-memory cache: { stockNum: { images: [Buffer], urls: [string], title: string } }
 const cache = {};
 
-const CONCURRENCY = 5; // number of parallel fetches
+const CONCURRENCY = 10; // number of parallel fetches
 const MAX_RETRIES = 1; // retry once
-const RETRY_DELAY = 200; // ms delay before retry
+const RETRY_DELAY = 500; // ms delay before retry
 
 //cron to clear cache
 cron.schedule('0 6 * * 2', () => { 
