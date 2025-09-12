@@ -43,7 +43,7 @@
 <div id="thumbnails"></div>
 
 <script>
-console.log("VERSION 2.0.2");
+console.log("VERSION 2.0.3");
 let allImages = [];
 
 function clearCache(){
@@ -88,10 +88,10 @@ async function loadPreviews() {
       div.appendChild(img);
 
       div.addEventListener('click', () => div.classList.toggle('selected'));
-      div.addEventListener('dragstart', dragStart);
-      div.addEventListener('dragover', dragOver);
-      div.addEventListener('drop', drop);
-      div.addEventListener('dragend', dragEnd);
+      // div.addEventListener('dragstart', dragStart);
+      // div.addEventListener('dragover', dragOver);
+      // div.addEventListener('drop', drop);
+      // div.addEventListener('dragend', dragEnd);
 
       container.appendChild(div);
     });
@@ -107,21 +107,21 @@ function selectAll() { document.querySelectorAll('.thumb').forEach(el => el.clas
 function clearSelection() { document.querySelectorAll('.thumb').forEach(el => el.classList.remove('selected')); }
 
 // Drag & Drop
-let dragSrc = null;
-function dragStart(e) { dragSrc = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
-function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
-function drop(e) {
-  e.stopPropagation();
-  if (dragSrc !== this) {
-    const container = document.getElementById('thumbnails');
-    const children = Array.from(container.children);
-    const srcIndex = children.indexOf(dragSrc);
-    const destIndex = children.indexOf(this);
-    if (srcIndex < destIndex) container.insertBefore(dragSrc, this.nextSibling);
-    else container.insertBefore(dragSrc, this);
-  }
-}
-function dragEnd() { this.classList.remove('dragging'); }
+// let dragSrc = null;
+// function dragStart(e) { dragSrc = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+// function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+// function drop(e) {
+//   e.stopPropagation();
+//   if (dragSrc !== this) {
+//     const container = document.getElementById('thumbnails');
+//     const children = Array.from(container.children);
+//     const srcIndex = children.indexOf(dragSrc);
+//     const destIndex = children.indexOf(this);
+//     if (srcIndex < destIndex) container.insertBefore(dragSrc, this.nextSibling);
+//     else container.insertBefore(dragSrc, this);
+//   }
+// }
+// function dragEnd() { this.classList.remove('dragging'); }
 
 async function downloadPDF() {
   const thumbnails = Array.from(document.querySelectorAll('.thumb'));
